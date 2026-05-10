@@ -1,160 +1,424 @@
 import os
 import csv
+import sqlite3
 from datetime import datetime
-def init_file():
-    file_exists=os.path.isfile("transactions.csv")
-    if not file_exists or os.path.getsize("transactions.csv")==0:
-        with open("transactions.csv","w",newline="")as file:
-            writer=csv.writer(file)
-            writer.writerow(["date","time","type","amount","detail"])
+import matplotlib.pyplot as plt
+import getpass
+
+DB_NAME = "expense_tracker.db"
+
+
+# ================= DATABASE =================
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS transactions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT,
+        time TEXT,
+        type TEXT,
+        amount REAL,
+        detail TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        username TEXT,
+        password TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# ================= COMMON =================
+
+def get_current_datetime():
+    now = datetime.now()
+    date = now.strftime("%Y-%m-%d")
+    time = now.strftime("%H:%M:%S")
+    return date, time
+
+
 def menu():
-    print("\n==Welcome to Expense Tracker==")
-    print("1.Add Income")
-    print("2.Add Expense")
-    print("3.View Transactions")
-    print("4.View Balance")
-    print("5.View search transactions by Type(income/expense):")
-    print("6.Logout")
-    print("7.Exit")
+    print("\n========== 💰 Expense Tracker ==========")
+    print("1️⃣ Add Income")
+    print("2️⃣ Add Expense")
+    print("3️⃣ View Transactions")
+    print("4️⃣ View Balance")
+    print("5️⃣ Search Transactions")
+    print("6️⃣ Delete Transaction")
+    print("7️⃣ Update Transaction")
+    print("8️⃣ Monthly Report")
+    print("9️⃣ Budget Check")
+    print("9️⃣ Show Expense Chart")
+    print("11 Logout")
+    print("12.Exit")
+
+
+# ================= AUTH =================
+
 def register():
-    username=input("Enter new username:")
-    password=input("Enter new password:")
-    with open("users.txt","a")as file:
-        file.write(f"{username},{password}\n")
-    print("Registered successfully!")
+    username = input("Enter new username: ")
+    password = getpass.getpass("Enter new password: ")
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "INSERT INTO users VALUES (?, ?)",
+        (username, password)
+    )
+
+    conn.commit()
+    conn.close()
+
+    print("✅ Registered Successfully!")
+
 
 def login():
-    username=input("username:")
-    password=input("password:")
-    try:
-        with open("users.txt","r")as file:
-            for line in file:
-                if "," not in line:
-                    continue
-                u,p=line.strip().split(",")
-                if u==username and p==password:
-                    print("login successfull!\n")
-                    return True
-    except FileNotFoundError:
-        print("No users found please register first")
-    print("Invalid credentials")
-    return False
-      
+    username = input("Username: ")
+    password = getpass.getpass("Password: ")
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM users WHERE username=? AND password=?",
+        (username, password)
+    )
+
+    user = cursor.fetchone()
+
+    conn.close()
+
+    if user:
+        print("✅ Login Successful!")
+        return True
+    else:
+        print("❌ Invalid Credentials")
+        return False
+
+
+# ================= ADD INCOME =================
+
 def add_income():
-    amount=float(input("Enter income amount:"))
-    source=input("Enter income source:")
-    now=datetime.now()
-    date=now.strftime("%y-%m-%d")
-    time=now.strftime("%H:%M:%S")
-    with open("transactions.csv","a",newline="")as file:
-        writer=csv.writer(file)
-        writer.writerow([date,time,"income",amount,source])
-    print("Income added successfully!")
+    amount = float(input("Enter income amount: "))
+    source = input("Enter income source: ")
+
+    date, time = get_current_datetime()
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    INSERT INTO transactions(date,time,type,amount,detail)
+    VALUES(?,?,?,?,?)
+    """, (date, time, "income", amount, source))
+
+    conn.commit()
+    conn.close()
+
+    print("✅ Income Added Successfully!")
+
+
+# ================= ADD EXPENSE =================
 
 def add_expense():
-    amount=float(input("Enter expense amount:"))
-    category=input("Enter expense category (Food,Travel,Groceries):")
-    now=datetime.now()
-    date=now.strftime("%y-%m-%d")
-    time=now.strftime("%H:%M:%S")
-    with open("transactions.csv","a",newline="")as file:
-        writer=csv.writer(file)
-        writer.writerow([date,time,"expense",amount,category])
-    print("Expense added successfully!")
+    amount = float(input("Enter expense amount: "))
+    category = input("Enter category (Food/Travel/Groceries): ")
+
+    date, time = get_current_datetime()
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    INSERT INTO transactions(date,time,type,amount,detail)
+    VALUES(?,?,?,?,?)
+    """, (date, time, "expense", amount, category))
+
+    conn.commit()
+    conn.close()
+
+    print("✅ Expense Added Successfully!")
+
+
+# ================= VIEW TRANSACTIONS =================
 
 def view_transactions():
-    print("\n--All Transactions--")
-    try:
-        with open("transactions.csv","r")as file:
-            reader=csv.reader(file)
-            print(f"{'date':<12}{'time':<8}{'type':<8}{'amount':<10}{'detail'}")
-            print("-"*60)
-            for row in reader:
-                if len(row)==5:
-                    date,time,trans_type,amount,detail=row
-                    print(f"{date:<12}|{time:<8}|{trans_type:<8}|₹{amount:<10}|{detail}")
-                else:
-                    print("skipped a row")
-    except FileNotFoundError:
-        print("No transactions found!")
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM transactions")
+    rows = cursor.fetchall()
+
+    print("\n================ TRANSACTIONS ================")
+    print(f"{'ID':<5}{'DATE':<15}{'TIME':<12}{'TYPE':<12}{'AMOUNT':<12}{'DETAIL'}")
+    print("-" * 70)
+
+    for row in rows:
+        id_, date, time, type_, amount, detail = row
+
+        print(f"{id_:<5}{date:<15}{time:<12}{type_:<12}₹{amount:<10}{detail}")
+
+    conn.close()
+
+
+# ================= VIEW BALANCE =================
 
 def view_balance():
-    income = 0
-    expense = 0
-    try:
-        with open("transactions.csv", "r") as file:
-            reader=csv.reader(file)
-            next(reader)
-            for row in reader:
-                type_=row[2]
-                amount=float(row[3])
-                if type_ == "income":
-                    income +=(amount)
-                elif type_ == "expense":
-                    expense += (amount)
-        balance=income-expense
-        print(f"\n💰 Total Income  : ₹{income}")
-        print(f"💸 Total Expense : ₹{expense}")
-        print(f"📊 Balance       : ₹{income - expense}")
-    except FileNotFoundError:
-        print("⚠️ No data found.")
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT SUM(amount) FROM transactions WHERE type='income'")
+    income = cursor.fetchone()[0]
+
+    cursor.execute("SELECT SUM(amount) FROM transactions WHERE type='expense'")
+    expense = cursor.fetchone()[0]
+
+    income = income if income else 0
+    expense = expense if expense else 0
+
+    balance = income - expense
+
+    print("\n========== BALANCE ==========")
+    print(f"💰 Total Income  : ₹{income}")
+    print(f"💸 Total Expense : ₹{expense}")
+    print(f"📊 Balance       : ₹{balance}")
+
+    conn.close()
+
+
+# ================= SEARCH =================
 
 def search_transactions():
-    search_type=input("Enter the type to search (Income/Expense):").lower()
-    found=False
-    print(f"\n---{search_type}transactions---")
-    try:
-        with open("transactions.csv","r")as file:
-                  for line in file:
-                      parts=line.strip().split(',')
-                      if len(parts)==5 and parts[2].strip().lower()==search_type.strip().lower():
-                          print(f"{parts[0]}{parts[1]}|{parts[2]:<8}{parts[3]}-{parts[4]}")
-                          found=True
-                  if not found:
-                      print(f"No{search_type}transactions found")
-    except FileNotFoundError:
-        print("No transactions found")
-                             
-init_file()
+    search_type = input("Enter type (income/expense): ").lower()
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT * FROM transactions
+    WHERE LOWER(type)=?
+    """, (search_type,))
+
+    rows = cursor.fetchall()
+
+    if rows:
+        print(f"\n===== {search_type.upper()} TRANSACTIONS =====")
+
+        for row in rows:
+            print(row)
+
+    else:
+        print("❌ No Transactions Found")
+
+    conn.close()
+
+
+# ================= DELETE =================
+
+def delete_transaction():
+    view_transactions()
+
+    id_delete = int(input("\nEnter Transaction ID to delete: "))
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM transactions WHERE id=?",
+        (id_delete,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    print("🗑️ Transaction Deleted Successfully!")
+
+# ================= UPDATE TRANSACTION =================
+
+def update_transaction():
+
+    view_transactions()
+
+    id_update = int(input("\nEnter Transaction ID to update: "))
+
+    new_amount = float(input("Enter new amount: "))
+    new_detail = input("Enter new detail/category: ")
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    UPDATE transactions
+    SET amount=?, detail=?
+    WHERE id=?
+    """, (new_amount, new_detail, id_update))
+
+    conn.commit()
+    conn.close()
+
+    print("✅ Transaction Updated Successfully!")
+
+
+# ================= MONTHLY REPORT =================
+
+def monthly_report():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT detail,SUM(amount)
+    FROM transactions
+    WHERE type='expense'
+    GROUP BY detail
+    """)
+
+    rows = cursor.fetchall()
+
+    print("\n========== MONTHLY REPORT ==========")
+
+    for detail, amount in rows:
+        print(f"{detail:<15} : ₹{amount}")
+
+    conn.close()
+
+
+# ================= BUDGET CHECK =================
+
+def budget_check():
+    limit = float(input("Enter your monthly budget limit: "))
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT SUM(amount)
+    FROM transactions
+    WHERE type='expense'
+    """)
+
+    total_expense = cursor.fetchone()[0]
+
+    total_expense = total_expense if total_expense else 0
+
+    print(f"\n💸 Total Expense: ₹{total_expense}")
+
+    if total_expense > limit:
+        print("⚠️ Budget Limit Exceeded!")
+    else:
+        print("✅ Budget Under Control")
+
+    conn.close()
+
+
+# ================= PIE CHART =================
+
+def expense_chart():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT detail,SUM(amount)
+    FROM transactions
+    WHERE type='expense'
+    GROUP BY detail
+    """)
+
+    rows = cursor.fetchall()
+
+    categories = []
+    amounts = []
+
+    for detail, amount in rows:
+        categories.append(detail)
+        amounts.append(amount)
+
+    plt.figure(figsize=(10, 10))
+    plt.pie(amounts, labels=categories, autopct="%1.1f%%")
+    plt.title("Expense Distribution")
+    plt.show()
+
+    conn.close()
+
+
+# ================= MAIN =================
+
+init_db()
+
 while True:
-    print("\n==Welcome to Expense Tracker==")
+
+    print("\n========== MAIN MENU ==========")
     print("1.Register")
     print("2.Login")
     print("3.Exit")
 
-    option=input("choose an option(1-3):")
-    if option=="1":
+    option = input("Choose an option: ")
+
+    if option == "1":
         register()
-    elif option=="2":
+
+    elif option == "2":
+
         if login():
+
             while True:
+
                 menu()
-                choice = input("Choose an option (1–6): ")
+
+                choice = input("Choose option: ")
+
                 if choice == "1":
                     add_income()
+
                 elif choice == "2":
                     add_expense()
+
                 elif choice == "3":
                     view_transactions()
+
                 elif choice == "4":
                     view_balance()
+
                 elif choice == "5":
                     search_transactions()
+
                 elif choice == "6":
-                    print("Logged out.Returning to main menu.\n")
+                    delete_transaction()
+
                 elif choice == "7":
-                    print("Exiting Thankyou!")
+                    update_transaction()
+
+                elif choice == "8":
+                    monthly_report()
+
+                elif choice == "9":
+                    budget_check()
+
+                elif choice == "10":
+                    expense_chart()
+
+                elif choice == "11":
+                    print("🔒 Logged Out Successfully!")
                     break
+
+                elif choice == "12":
+                    print("🙏 Thank You!")
+                    exit()
+
                 else:
-                    print("❌ Invalid choice. Try again.")
-    elif option=="3":
-        print("Thankyou!Exiting...")
+                    print("❌ Invalid Choice")
+
+    elif option == "3":
+        print("🙏 Exiting Program...")
         break
+
     else:
-        print("Invalid choice.Try again")
-    
-
-
-
-
-        
+        print("❌ Invalid Option")
