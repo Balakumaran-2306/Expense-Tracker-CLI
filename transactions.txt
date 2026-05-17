@@ -1,14 +1,9 @@
-1000.0,Income,job
-2000.0,expense,food
-10000.0,Income,job
-2000.0,expense,food
-50000.0,Income,job
-25000.0,expense,Emi
-90000.0,Income,job
-25000.0,expense,emi
-20000.0,Income,job
-10000.0,expense,emi
-25-06-1722:46:47,65000.0,Income,job
-25-06-1722:47:00,30000.0,expense,emi
-25-06-1722:52:37,90000.0,Income,job
-25-06-1722:52:46,70000.0,expense,food
+ID  DATE	      TIME	   TYPE	  AMOUNT DETAIL
+1	05-05-2026	22:11:24	income	50000	Job
+3	05-05-2026	22:14:57	expense	20000	Food
+4	05-05-2026	22:15:05	expense	20000	emi
+5	05-05-2026	22:15:18	expense	10000	groceries
+6	09-05-2026	08:31:27	income	7000	job
+7	17-05-2026	08:58:18	income	20000	Job
+8	17-05-2026	08:59:08	expense	10000	emi
+
