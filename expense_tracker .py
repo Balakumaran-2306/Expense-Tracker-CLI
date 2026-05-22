@@ -11,6 +11,7 @@ DB_NAME = "expense_tracker.db"
 # ================= DATABASE =================
 
 def init_db():
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
@@ -39,14 +40,19 @@ def init_db():
 # ================= COMMON =================
 
 def get_current_datetime():
+
     now = datetime.now()
+
     date = now.strftime("%Y-%m-%d")
     time = now.strftime("%H:%M:%S")
+
     return date, time
 
 
 def menu():
+
     print("\n========== 💰 Expense Tracker ==========")
+
     print("1️⃣ Add Income")
     print("2️⃣ Add Expense")
     print("3️⃣ View Transactions")
@@ -56,19 +62,34 @@ def menu():
     print("7️⃣ Update Transaction")
     print("8️⃣ Monthly Report")
     print("9️⃣ Budget Check")
-    print("9️⃣ Show Expense Chart")
-    print("11 Logout")
-    print("12.Exit")
+    print("🔟 Show Expense Chart")
+    print("11️⃣ Export CSV")
+    print("12️⃣ Logout")
+    print("13️⃣ Exit")
 
 
 # ================= AUTH =================
 
 def register():
+
     username = input("Enter new username: ")
     password = getpass.getpass("Enter new password: ")
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+
+    # Check existing username
+    cursor.execute(
+        "SELECT * FROM users WHERE username=?",
+        (username,)
+    )
+
+    existing_user = cursor.fetchone()
+
+    if existing_user:
+        print("❌ Username already exists!")
+        conn.close()
+        return
 
     cursor.execute(
         "INSERT INTO users VALUES (?, ?)",
@@ -82,6 +103,7 @@ def register():
 
 
 def login():
+
     username = input("Username: ")
     password = getpass.getpass("Password: ")
 
@@ -100,6 +122,7 @@ def login():
     if user:
         print("✅ Login Successful!")
         return True
+
     else:
         print("❌ Invalid Credentials")
         return False
@@ -108,7 +131,14 @@ def login():
 # ================= ADD INCOME =================
 
 def add_income():
-    amount = float(input("Enter income amount: "))
+
+    try:
+        amount = float(input("Enter income amount: "))
+
+    except ValueError:
+        print("❌ Invalid Amount")
+        return
+
     source = input("Enter income source: ")
 
     date, time = get_current_datetime()
@@ -130,8 +160,17 @@ def add_income():
 # ================= ADD EXPENSE =================
 
 def add_expense():
-    amount = float(input("Enter expense amount: "))
-    category = input("Enter category (Food/Travel/Groceries): ")
+
+    try:
+        amount = float(input("Enter expense amount: "))
+
+    except ValueError:
+        print("❌ Invalid Amount")
+        return
+
+    category = input(
+        "Enter category (Food/Travel/Groceries): "
+    )
 
     date, time = get_current_datetime()
 
@@ -152,20 +191,34 @@ def add_expense():
 # ================= VIEW TRANSACTIONS =================
 
 def view_transactions():
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM transactions")
+
     rows = cursor.fetchall()
 
+    if not rows:
+        print("❌ No Transactions Available")
+        conn.close()
+        return
+
     print("\n================ TRANSACTIONS ================")
-    print(f"{'ID':<5}{'DATE':<15}{'TIME':<12}{'TYPE':<12}{'AMOUNT':<12}{'DETAIL'}")
+
+    print(
+        f"{'ID':<5}{'DATE':<15}{'TIME':<12}{'TYPE':<12}{'AMOUNT':<12}{'DETAIL'}"
+    )
+
     print("-" * 70)
 
     for row in rows:
+
         id_, date, time, type_, amount, detail = row
 
-        print(f"{id_:<5}{date:<15}{time:<12}{type_:<12}₹{amount:<10}{detail}")
+        print(
+            f"{id_:<5}{date:<15}{time:<12}{type_:<12}₹{amount:<10.2f}{detail}"
+        )
 
     conn.close()
 
@@ -173,13 +226,20 @@ def view_transactions():
 # ================= VIEW BALANCE =================
 
 def view_balance():
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT SUM(amount) FROM transactions WHERE type='income'")
+    cursor.execute(
+        "SELECT SUM(amount) FROM transactions WHERE type='income'"
+    )
+
     income = cursor.fetchone()[0]
 
-    cursor.execute("SELECT SUM(amount) FROM transactions WHERE type='expense'")
+    cursor.execute(
+        "SELECT SUM(amount) FROM transactions WHERE type='expense'"
+    )
+
     expense = cursor.fetchone()[0]
 
     income = income if income else 0
@@ -188,9 +248,10 @@ def view_balance():
     balance = income - expense
 
     print("\n========== BALANCE ==========")
-    print(f"💰 Total Income  : ₹{income}")
-    print(f"💸 Total Expense : ₹{expense}")
-    print(f"📊 Balance       : ₹{balance}")
+
+    print(f"💰 Total Income  : ₹{income:.2f}")
+    print(f"💸 Total Expense : ₹{expense:.2f}")
+    print(f"📊 Balance       : ₹{balance:.2f}")
 
     conn.close()
 
@@ -198,7 +259,12 @@ def view_balance():
 # ================= SEARCH =================
 
 def search_transactions():
-    search_type = input("Enter type (income/expense): ").lower()
+
+    print("Search available: income / expense")
+
+    search_type = input(
+        "Enter type (income/expense): "
+    ).lower()
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -211,6 +277,7 @@ def search_transactions():
     rows = cursor.fetchall()
 
     if rows:
+
         print(f"\n===== {search_type.upper()} TRANSACTIONS =====")
 
         for row in rows:
@@ -225,9 +292,17 @@ def search_transactions():
 # ================= DELETE =================
 
 def delete_transaction():
+
     view_transactions()
 
-    id_delete = int(input("\nEnter Transaction ID to delete: "))
+    try:
+        id_delete = int(
+            input("\nEnter Transaction ID to delete: ")
+        )
+
+    except ValueError:
+        print("❌ Invalid ID")
+        return
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -242,16 +317,29 @@ def delete_transaction():
 
     print("🗑️ Transaction Deleted Successfully!")
 
+
 # ================= UPDATE TRANSACTION =================
 
 def update_transaction():
 
     view_transactions()
 
-    id_update = int(input("\nEnter Transaction ID to update: "))
+    try:
+        id_update = int(
+            input("\nEnter Transaction ID to update: ")
+        )
 
-    new_amount = float(input("Enter new amount: "))
-    new_detail = input("Enter new detail/category: ")
+        new_amount = float(
+            input("Enter new amount: ")
+        )
+
+    except ValueError:
+        print("❌ Invalid Input")
+        return
+
+    new_detail = input(
+        "Enter new detail/category: "
+    )
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -271,6 +359,7 @@ def update_transaction():
 # ================= MONTHLY REPORT =================
 
 def monthly_report():
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
@@ -286,7 +375,7 @@ def monthly_report():
     print("\n========== MONTHLY REPORT ==========")
 
     for detail, amount in rows:
-        print(f"{detail:<15} : ₹{amount}")
+        print(f"{detail:<15} : ₹{amount:.2f}")
 
     conn.close()
 
@@ -294,7 +383,15 @@ def monthly_report():
 # ================= BUDGET CHECK =================
 
 def budget_check():
-    limit = float(input("Enter your monthly budget limit: "))
+
+    try:
+        limit = float(
+            input("Enter your monthly budget limit: ")
+        )
+
+    except ValueError:
+        print("❌ Invalid Budget Amount")
+        return
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -309,19 +406,53 @@ def budget_check():
 
     total_expense = total_expense if total_expense else 0
 
-    print(f"\n💸 Total Expense: ₹{total_expense}")
+    print(f"\n💸 Total Expense: ₹{total_expense:.2f}")
 
     if total_expense > limit:
         print("⚠️ Budget Limit Exceeded!")
+
     else:
         print("✅ Budget Under Control")
 
     conn.close()
 
 
+# ================= EXPORT CSV =================
+
+def export_to_csv():
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM transactions")
+
+    rows = cursor.fetchall()
+
+    with open(
+        "transactions.csv",
+        "w",
+        newline=""
+    ) as file:
+
+        writer = csv.writer(file)
+
+        writer.writerow(
+            ["ID", "DATE", "TIME", "TYPE", "AMOUNT", "DETAIL"]
+        )
+
+        writer.writerows(rows)
+
+    conn.close()
+
+    print("✅ Transactions Exported Successfully!")
+    print("📁 File saved as transactions.csv")
+    print("📂 Current Location:", os.getcwd())
+
+
 # ================= PIE CHART =================
 
 def expense_chart():
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
@@ -334,16 +465,29 @@ def expense_chart():
 
     rows = cursor.fetchall()
 
+    if not rows:
+        print("❌ No Expense Data Available")
+        conn.close()
+        return
+
     categories = []
     amounts = []
 
     for detail, amount in rows:
+
         categories.append(detail)
         amounts.append(amount)
 
     plt.figure(figsize=(10, 10))
-    plt.pie(amounts, labels=categories, autopct="%1.1f%%")
+
+    plt.pie(
+        amounts,
+        labels=categories,
+        autopct="%1.1f%%"
+    )
+
     plt.title("Expense Distribution")
+
     plt.show()
 
     conn.close()
@@ -356,6 +500,7 @@ init_db()
 while True:
 
     print("\n========== MAIN MENU ==========")
+
     print("1.Register")
     print("2.Login")
     print("3.Exit")
@@ -363,6 +508,7 @@ while True:
     option = input("Choose an option: ")
 
     if option == "1":
+
         register()
 
     elif option == "2":
@@ -406,10 +552,15 @@ while True:
                     expense_chart()
 
                 elif choice == "11":
+                    export_to_csv()
+
+                elif choice == "12":
+
                     print("🔒 Logged Out Successfully!")
                     break
 
-                elif choice == "12":
+                elif choice == "13":
+
                     print("🙏 Thank You!")
                     exit()
 
@@ -417,6 +568,7 @@ while True:
                     print("❌ Invalid Choice")
 
     elif option == "3":
+
         print("🙏 Exiting Program...")
         break
 
